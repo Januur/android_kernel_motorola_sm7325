@@ -44,8 +44,8 @@ jobs:
           export ARCH=arm64
           export SUBARCH=arm64
 
-          echo "=== Step 1: Base defconfig ==="
-          make O=out ARCH=arm64 lahaina-qgki_defconfig
+        echo "=== Step 1: Base defconfig ==="
+          make O=out ARCH=arm64 vendor/lahaina-qgki_defconfig
 
           echo "=== Step 2: Merge berlna config ==="
           scripts/kconfig/merge_config.sh -m -O out \
