@@ -16,11 +16,7 @@ jobs:
       - name: Setup build environment
         run: |
           sudo apt update
-          sudo apt install -y \
-            git make bc bison flex libssl-dev libelf-dev \
-            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            binutils-aarch64-linux-gnu python3 ccache \
-            zip unzip curl wget
+          sudo apt install -y git make bc bison flex libssl-dev libelf-dev gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-aarch64-linux-gnu python3 ccache zip unzip curl wget
 
       - name: Download Clang toolchain
         run: |
@@ -48,24 +44,14 @@ jobs:
           export KBUILD_BUILD_USER="januur"
           export KBUILD_BUILD_HOST="github"
           export MOTO_DT_OVERLAY=true
-
-          echo "=== Step 1: Base defconfig ==="
+          echo "=== Step 1 ==="
           make O=out ARCH=arm64 vendor/lahaina-qgki_defconfig
-
-          echo "=== Step 2: Merge berlna config ==="
+          echo "=== Step 2 ==="
           scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/lineage_berlna.config
-
-          echo "=== Step 3: Finalize config ==="
+          echo "=== Step 3 ==="
           make O=out ARCH=arm64 olddefconfig
-
-          echo "=== Step 4: Compile ==="
-          make -j$(nproc --all) O=out ARCH=arm64 \
-            CC=clang \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=aarch64-linux-android- \
-            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
-            MOTO_DT_OVERLAY=true \
-            Image 2>&1 | grep -E "error:|Error|warning:.*error|Image" | head -30
+          echo "=== Step 4 ==="
+          make -j$(nproc --all) O=out ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-android- CROSS_COMPILE_ARM32=arm-linux-androideabi- MOTO_DT_OVERLAY=true Image 2>&1 | grep -E "error:|Error|Image" | head -30
 
       - name: Check output
         run: |
@@ -98,12 +84,3 @@ jobs:
         with:
           name: kernel-berlna-zip
           path: ~/kernel-berlna.zip
-```
-
----
-
-## Sirf Ek Cheez Badli ✅
-
-**Clang 17 → Clang 14** — yeh kernel Clang 14 se compile hota hai, 17 se nahi!
-```
-Clang-14.0.6-20220828.tar.gz
