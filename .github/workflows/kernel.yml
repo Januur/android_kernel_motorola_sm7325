@@ -21,7 +21,7 @@ jobs:
       - name: Download Clang toolchain
         run: |
           mkdir -p ~/clang
-          wget -q https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20220828-release/Clang-14.0.6-20220828.tar.gz -O ~/clang.tar.gz
+          wget https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20220828-release/Clang-14.0.6-20220828.tar.gz -O ~/clang.tar.gz
           tar -xf ~/clang.tar.gz -C ~/clang
           ~/clang/bin/clang --version
 
