@@ -25,7 +25,7 @@ jobs:
       - name: Download Clang toolchain
         run: |
           mkdir -p ~/clang
-          wget -q https://github.com/ZyCromerZ/Clang/releases/download/17.0.0-20230725-release/Clang-17.0.0-20230725.tar.gz -O ~/clang.tar.gz
+          wget -q https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20220828-release/Clang-14.0.6-20220828.tar.gz -O ~/clang.tar.gz
           tar -xf ~/clang.tar.gz -C ~/clang
           ~/clang/bin/clang --version
 
@@ -65,26 +65,12 @@ jobs:
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             MOTO_DT_OVERLAY=true \
-            Image 2>&1 | grep -E "error:|warning:|Error|FAILED|Image" | tail -50
-
-      - name: Show full error if failed
-        if: failure()
-        run: |
-          echo "=== Last 200 lines of build ==="
-          make -j$(nproc --all) O=out ARCH=arm64 \
-            CC=$HOME/clang/bin/clang \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=$HOME/gcc64/bin/aarch64-linux-android- \
-            CROSS_COMPILE_ARM32=$HOME/gcc32/bin/arm-linux-androideabi- \
-            MOTO_DT_OVERLAY=true \
-            Image 2>&1 | grep -E "error:" | head -20
-          export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
+            Image 2>&1 | grep -E "error:|Error|warning:.*error|Image" | head -30
 
       - name: Check output
         run: |
           echo "=== All boot files ==="
           find out/arch/arm64/boot/ -type f 2>/dev/null || echo "Nothing!"
-          ls -lh out/arch/arm64/boot/ 2>/dev/null || true
 
       - name: Package with AnyKernel3
         run: |
@@ -112,3 +98,12 @@ jobs:
         with:
           name: kernel-berlna-zip
           path: ~/kernel-berlna.zip
+```
+
+---
+
+## Sirf Ek Cheez Badli ✅
+
+**Clang 17 → Clang 14** — yeh kernel Clang 14 se compile hota hai, 17 se nahi!
+```
+Clang-14.0.6-20220828.tar.gz
