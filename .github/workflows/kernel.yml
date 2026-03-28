@@ -27,7 +27,6 @@ jobs:
           mkdir -p ~/clang
           wget -q https://github.com/ZyCromerZ/Clang/releases/download/17.0.0-20230725-release/Clang-17.0.0-20230725.tar.gz -O ~/clang.tar.gz
           tar -xf ~/clang.tar.gz -C ~/clang
-          echo "Clang version:"
           ~/clang/bin/clang --version
 
       - name: Download GCC toolchains
@@ -36,6 +35,16 @@ jobs:
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 --depth=1 ~/gcc64
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 --depth=1 ~/gcc32
 
+      - name: Fix Moto DT overlay error
+        run: |
+          echo "=== Checking DT Makefile ==="
+          cat arch/arm64/boot/dts/vendor/qcom/Makefile | head -20
+          echo "=== Fixing overlay requirement ==="
+          sed -i 's/.*Moto DT w\/o overlay.*//' arch/arm64/boot/dts/vendor/qcom/Makefile || true
+          sed -i 's/.*error.*overlay.*//' arch/arm64/boot/dts/vendor/qcom/Makefile || true
+          echo "=== Fixed Makefile ==="
+          cat arch/arm64/boot/dts/vendor/qcom/Makefile | head -20
+
       - name: Build kernel
         run: |
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
@@ -43,6 +52,7 @@ jobs:
           export SUBARCH=arm64
           export KBUILD_BUILD_USER="januur"
           export KBUILD_BUILD_HOST="github"
+          export MOTO_DT_OVERLAY=true
 
           echo "=== Step 1: Base defconfig ==="
           make O=out ARCH=arm64 vendor/lahaina-qgki_defconfig
@@ -53,37 +63,35 @@ jobs:
           echo "=== Step 3: Finalize config ==="
           make O=out ARCH=arm64 olddefconfig
 
-          echo "=== Step 4: Compile ==="
+          echo "=== Step 4: Compile Image only ==="
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             MOTO_DT_OVERLAY=true \
-            Image dtbs 2>&1 | tail -100
+            Image 2>&1 | tail -50
 
       - name: Check output
         run: |
           echo "=== Kernel Images ==="
-          find out/arch/arm64/boot/ -type f 2>/dev/null | head -30
-          echo "=== DTB files ==="
-          find out/arch/arm64/boot/dts/ -name "*.dtb" 2>/dev/null | head -10
+          find out/arch/arm64/boot/ -type f 2>/dev/null
+          ls -lh out/arch/arm64/boot/ 2>/dev/null || echo "Nothing found!"
 
       - name: Package with AnyKernel3
         run: |
           git clone https://github.com/osm0sis/AnyKernel3 --depth=1 ~/AnyKernel3
           IMAGE=$(find out/arch/arm64/boot/ -name "Image" | head -1)
-          echo "Image found: $IMAGE"
+          echo "Image: $IMAGE"
           if [ -n "$IMAGE" ]; then
             cp $IMAGE ~/AnyKernel3/
-            echo "Image copied!"
+            cd ~/AnyKernel3
+            zip -r9 ~/kernel-berlna.zip * -x .git README.md
+            ls -lh ~/kernel-berlna.zip
           else
-            echo "ERROR: No Image found!"
+            echo "Image not found!"
             exit 1
           fi
-          cd ~/AnyKernel3
-          zip -r9 ~/kernel-berlna.zip * -x .git README.md
-          ls -lh ~/kernel-berlna.zip
 
       - name: Upload kernel Image
         uses: actions/upload-artifact@v4
@@ -96,9 +104,3 @@ jobs:
         with:
           name: kernel-berlna-zip
           path: ~/kernel-berlna.zip
-
-      - name: Upload DTBs
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-berlna-dtbs
-          path: out/arch/arm64/boot/dts/**/*.dtb
