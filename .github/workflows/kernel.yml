@@ -25,10 +25,10 @@ jobs:
       - name: Download Clang toolchain
         run: |
           mkdir -p ~/clang
-          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r487747c.tar.gz -O ~/clang.tar.gz || \
           wget -q https://github.com/ZyCromerZ/Clang/releases/download/17.0.0-20230725-release/Clang-17.0.0-20230725.tar.gz -O ~/clang.tar.gz
-          tar -xf ~/clang.tar.gz -C ~/clang 2>/dev/null || true
-          ls ~/clang/bin/ | head -10
+          tar -xf ~/clang.tar.gz -C ~/clang
+          echo "Clang version:"
+          ~/clang/bin/clang --version
 
       - name: Download GCC toolchains
         run: |
@@ -38,67 +38,42 @@ jobs:
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 \
             --depth=1 ~/gcc32
 
-      - name: Set environment variables
-        run: |
-          echo "ARCH=arm64" >> $GITHUB_ENV
-          echo "SUBARCH=arm64" >> $GITHUB_ENV
-          echo "CLANG_PATH=$HOME/clang/bin" >> $GITHUB_ENV
-          echo "GCC64=$HOME/gcc64/bin/aarch64-linux-android-" >> $GITHUB_ENV
-          echo "GCC32=$HOME/gcc32/bin/arm-linux-androideabi-" >> $GITHUB_ENV
-          echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
-          echo "DEFCONFIG=vendor/berlna_defconfig" >> $GITHUB_ENV
-
-      - name: Check defconfig exists
-        run: |
-          echo "=== Available defconfigs ==="
-          find arch/arm64/configs/ -name "*berl*" -o -name "*sm7325*" -o -name "*motorola*" 2>/dev/null
-          find arch/arm64/configs/ | head -30
-
       - name: Build kernel
         run: |
-          export PATH="$CLANG_PATH:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
-          
-          # Try to find correct defconfig
-          DEFCONFIG=$(find arch/arm64/configs/ -name "*berl*" | head -1)
-          if [ -z "$DEFCONFIG" ]; then
-            DEFCONFIG=$(find arch/arm64/configs/ -name "*sm7325*" | head -1)
-          fi
-          if [ -z "$DEFCONFIG" ]; then
-            DEFCONFIG="vendor/berlna_defconfig"
-          fi
-          
-          DEFCONFIG_NAME=$(basename $DEFCONFIG)
-          echo "Using defconfig: $DEFCONFIG_NAME"
-          
-          make O=out ARCH=arm64 $DEFCONFIG_NAME
-          
+          export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+
+          echo "=== Step 1: Base defconfig ==="
+          make O=out ARCH=arm64 lahaina-qgki_defconfig
+
+          echo "=== Step 2: Merge berlna config ==="
+          scripts/kconfig/merge_config.sh -m -O out \
+            out/.config \
+            arch/arm64/configs/vendor/lineage_berlna.config
+
+          echo "=== Step 3: Finalize config ==="
+          make O=out ARCH=arm64 olddefconfig
+
+          echo "=== Step 4: Compile! ==="
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
-            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
-            2>&1 | tail -50
+            CROSS_COMPILE_ARM32=arm-linux-androideabi-
 
       - name: Check output
         run: |
-          echo "=== Kernel Image ==="
+          echo "=== Kernel Images ==="
           find out/arch/arm64/boot/ -type f | head -20
           ls -lh out/arch/arm64/boot/ 2>/dev/null
 
       - name: Package with AnyKernel3
         run: |
           git clone https://github.com/osm0sis/AnyKernel3 --depth=1 ~/AnyKernel3
-          
-          # Copy kernel image
           IMAGE=$(find out/arch/arm64/boot/ -name "Image*" | head -1)
-          DTB=$(find out/arch/arm64/boot/dts/ -name "*.dtb" | head -1)
-          
-          echo "Image: $IMAGE"
-          echo "DTB: $DTB"
-          
-          cp $IMAGE ~/AnyKernel3/ 2>/dev/null || echo "Image not found!"
-          cp $DTB ~/AnyKernel3/dtb 2>/dev/null || echo "DTB not found!"
-          
+          echo "Image found: $IMAGE"
+          cp $IMAGE ~/AnyKernel3/ 2>/dev/null || echo "Image copy failed!"
           cd ~/AnyKernel3
           zip -r9 ~/kernel-berlna.zip * -x .git README.md
           ls -lh ~/kernel-berlna.zip
@@ -114,9 +89,3 @@ jobs:
         with:
           name: kernel-berlna-zip
           path: ~/kernel-berlna.zip
-
-      - name: Upload DTB
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-berlna-dtb
-          path: out/arch/arm64/boot/dts/**/*.dtb
