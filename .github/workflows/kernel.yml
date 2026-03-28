@@ -37,13 +37,8 @@ jobs:
 
       - name: Fix Moto DT overlay error
         run: |
-          echo "=== Checking DT Makefile ==="
-          cat arch/arm64/boot/dts/vendor/qcom/Makefile | head -20
-          echo "=== Fixing overlay requirement ==="
-          sed -i 's/.*Moto DT w\/o overlay.*//' arch/arm64/boot/dts/vendor/qcom/Makefile || true
-          sed -i 's/.*error.*overlay.*//' arch/arm64/boot/dts/vendor/qcom/Makefile || true
-          echo "=== Fixed Makefile ==="
-          cat arch/arm64/boot/dts/vendor/qcom/Makefile | head -20
+          sed -i 's/$(error Moto DT w\/o overlay is undefined!!!)//' arch/arm64/boot/dts/vendor/qcom/Makefile
+          echo "Fixed!"
 
       - name: Build kernel
         run: |
@@ -63,20 +58,33 @@ jobs:
           echo "=== Step 3: Finalize config ==="
           make O=out ARCH=arm64 olddefconfig
 
-          echo "=== Step 4: Compile Image only ==="
+          echo "=== Step 4: Compile ==="
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             MOTO_DT_OVERLAY=true \
-            Image 2>&1 | tail -50
+            Image 2>&1 | grep -E "error:|warning:|Error|FAILED|Image" | tail -50
+
+      - name: Show full error if failed
+        if: failure()
+        run: |
+          echo "=== Last 200 lines of build ==="
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CC=$HOME/clang/bin/clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=$HOME/gcc64/bin/aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=$HOME/gcc32/bin/arm-linux-androideabi- \
+            MOTO_DT_OVERLAY=true \
+            Image 2>&1 | grep -E "error:" | head -20
+          export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
 
       - name: Check output
         run: |
-          echo "=== Kernel Images ==="
-          find out/arch/arm64/boot/ -type f 2>/dev/null
-          ls -lh out/arch/arm64/boot/ 2>/dev/null || echo "Nothing found!"
+          echo "=== All boot files ==="
+          find out/arch/arm64/boot/ -type f 2>/dev/null || echo "Nothing!"
+          ls -lh out/arch/arm64/boot/ 2>/dev/null || true
 
       - name: Package with AnyKernel3
         run: |
